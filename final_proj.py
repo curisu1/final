@@ -11,16 +11,33 @@ import numpy as np
 # Suppress GPU warnings if GPU is not required
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# Check TensorFlow device
+# Check TensorFlow devices
 devices = tf.config.list_physical_devices()
 st.write("Using device(s):", devices)
 
-# Load the trained model
-try:
-    model = tf.keras.models.load_model('cifar10_model.h5')
-except Exception as e:
-    st.error(f"Error loading model: {str(e)}")
-    st.stop()
+# Function to load the trained model with error handling
+def load_model_with_custom_objects(model_path):
+    from tensorflow.keras.losses import SparseCategoricalCrossentropy
+
+    def custom_sparse_categorical_crossentropy(**kwargs):
+        """Handle unexpected arguments in deserialization."""
+        kwargs.pop("fn", None)  # Remove unsupported 'fn' key if present
+        return SparseCategoricalCrossentropy(**kwargs)
+
+    try:
+        model = tf.keras.models.load_model(
+            model_path,
+            custom_objects={
+                "SparseCategoricalCrossentropy": custom_sparse_categorical_crossentropy
+            },
+        )
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        st.stop()
+
+# Load the model
+model = load_model_with_custom_objects("cifar10_model.h5")
 
 # Streamlit app
 st.title("Image Classification App")
@@ -44,7 +61,10 @@ def label_class(class_number):
 # Sidebar for image upload
 with st.sidebar:
     st.header("Upload Image")
-    st.caption("This app is limited to classifying the following categories: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, and truck.")
+    st.caption(
+        "This app is limited to classifying the following categories: airplane, "
+        "automobile, bird, cat, deer, dog, frog, horse, ship, and truck."
+    )
     uploaded_file = st.file_uploader("Upload an image (jpg, jpeg, png)", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
@@ -59,7 +79,7 @@ if uploaded_file:
 
         # Make predictions
         predictions = model.predict(image_array)
-        top_classes = tf.argsort(predictions[0], direction='DESCENDING')[:3]  # Top 3 predictions
+        top_classes = tf.argsort(predictions[0], direction="DESCENDING")[:3]  # Top 3 predictions
         top_scores = tf.nn.softmax(predictions[0][top_classes])
 
         # Display the highest confidence prediction
