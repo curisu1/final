@@ -1,27 +1,33 @@
+# -*- coding: utf-8 -*-
+"""final_proj.py
+Streamlit app for image classification using a CIFAR-10 trained model.
+"""
 
-
-
-
+import os
 import tensorflow as tf
 import streamlit as st
-import os
+import numpy as np
 
-st.title("Image Classification App - Debug Mode")
+# Suppress GPU warnings if GPU is not required
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+# Check TensorFlow device
+devices = tf.config.list_physical_devices()
+st.write("Using device(s):", devices)
+
+# Load the trained model
 try:
-    # Check if the model file exists
-    if not os.path.exists('cifar10_model.h5'):
-        raise FileNotFoundError("The model file 'cifar10_model.h5' is missing.")
-    
-    # Attempt to load the model
     model = tf.keras.models.load_model('cifar10_model.h5')
-    st.success("Model loaded successfully!")
 except Exception as e:
-    st.error(f"Failed to load model: {e}")
+    st.error(f"Error loading model: {str(e)}")
     st.stop()
 
+# Streamlit app
+st.title("Image Classification App")
+
 def label_class(class_number):
-    switch = {
+    """Maps class indices to human-readable labels."""
+    class_labels = {
         0: "Airplane",
         1: "Automobile",
         2: "Bird",
@@ -33,22 +39,16 @@ def label_class(class_number):
         8: "Ship",
         9: "Truck",
     }
-    return switch.get(class_number.numpy(), "Invalid class number")
+    return class_labels.get(class_number, "Invalid class number")
 
+# Sidebar for image upload
 with st.sidebar:
-    st.title("Image Classification App")
-    # Tooltips also support markdown
-    radio_markdown = '''
-    Upload an image, There are **limitations**!
-    '''.strip()
-    limit_expander = st.expander("**NOTICE**", expanded=False)
-    with limit_expander:
-        st.caption('This **APP** is limited to classifying these images: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, and truck.')
-    # Upload an image through Streamlit
-    uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"], help=radio_markdown)
+    st.header("Upload Image")
+    st.caption("This app is limited to classifying the following categories: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, and truck.")
+    uploaded_file = st.file_uploader("Upload an image (jpg, jpeg, png)", type=["jpg", "jpeg", "png"])
 
-try:
-    if uploaded_file is not None:
+if uploaded_file:
+    try:
         # Preprocess the image
         image = tf.keras.preprocessing.image.load_img(uploaded_file, target_size=(32, 32))
         image_array = tf.keras.preprocessing.image.img_to_array(image)
@@ -59,24 +59,25 @@ try:
 
         # Make predictions
         predictions = model.predict(image_array)
-        top_classes = tf.argsort(predictions[0], direction='DESCENDING')[:3]  # Display top 3 predictions
+        top_classes = tf.argsort(predictions[0], direction='DESCENDING')[:3]  # Top 3 predictions
         top_scores = tf.nn.softmax(predictions[0][top_classes])
 
-        # Display the results
         # Display the highest confidence prediction
-        highest_confidence_idx = top_classes[0]
+        highest_confidence_idx = top_classes[0].numpy()
         highest_confidence_label = label_class(highest_confidence_idx)
         highest_confidence_score = 100 * top_scores[0].numpy()
-        st.write(f"Highest Confidence: Class {highest_confidence_label}, Confidence: {highest_confidence_score:.2f}%")
+        st.write(f"Highest Confidence: {highest_confidence_label} ({highest_confidence_score:.2f}%)")
 
-        st.write("Top Predictions:")
-        for i, (class_idx, score) in enumerate(zip(top_classes, top_scores)):
+        # Display top predictions
+        st.subheader("Top Predictions")
+        for i, (class_idx, score) in enumerate(zip(top_classes.numpy(), top_scores.numpy())):
             class_label = label_class(class_idx)
-            st.write(f"{i + 1}. Class: {class_label}, Confidence: {100 * score:.2f}%")
-        st.image(image, caption="Uploaded Image", use_column_width=True, width=300)
+            st.write(f"{i + 1}. {class_label}: {100 * score:.2f}%")
 
+        # Display the uploaded image
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
-
-
-except Exception as e:
-    st.write("An error occurred:", str(e))
+    except Exception as e:
+        st.error(f"An error occurred during processing: {str(e)}")
+else:
+    st.info("Please upload an image to proceed.")
