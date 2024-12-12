@@ -1,4 +1,5 @@
-tensorflow==2.14.0
+pip install tensorflow==2.18.0
+
 keras==2.14.0
 streamlit>=1.5.0
 h5py>=3.5.0
